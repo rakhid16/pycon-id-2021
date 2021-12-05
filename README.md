@@ -3,6 +3,13 @@ A simple demo for Python Conference Indonesia 2021<br>
 
 ![Python version](https://img.shields.io/badge/Python-3.8.1-blue.svg)
 
+Data source: https://www.kaggle.com/c/dogs-vs-cats<br>
+I'm only take the data in **train.zip**.<br>
+Data test: 258 total images<br>
+Data test: 606 total images<br>
+You're free to change the amount of the data (if you want) for you self-experiment, as well.
+
+## How to:
 1. Create your virtual environment<br>
 `$ virtualenv .venv`
 2. Activate it<br>
@@ -10,3 +17,8 @@ A simple demo for Python Conference Indonesia 2021<br>
 3. Install the third party libraries<br>
 `$ pip install -r requirements.txt`
 4. Have fun!
+
+## My structure:
+<center>
+<img src="https://i.imgur.com/J3RQqdu.jpg">
+</center>
