@@ -3,12 +3,7 @@ import torch
 
 from sklearn.metrics import (
     classification_report,
-    confusion_matrix,
-    roc_auc_score)
-from sklearn.preprocessing import OneHotEncoder
-from torchattacks import (
-    FGSM, BIM, CW, RFGSM, PGDL2,
-    TPGD, FAB, DeepFool, SparseFool)
+    confusion_matrix)
 from torchvision import datasets, transforms
 
 
@@ -24,7 +19,7 @@ def load_image(train_path: str, test_path: str):
     It return tranformed images of data train and test
     """
 
-    # It can be customized as well
+    # Can be customized as well
     train_transforms = transforms.Compose([
         transforms.Resize((100, 100)),
         transforms.ToTensor()])
@@ -37,7 +32,7 @@ def load_image(train_path: str, test_path: str):
 def sampling(train_path: str, test_path: str):
     """
     This function is to perform a sampling
-    technique from related dataset.
+    technique from given dataset.
     """
 
     # Load image to train_set & test_set variable
@@ -104,6 +99,7 @@ def cnn_model(torch_model):
         torch.nn.Linear(nodes, 512),
         torch.nn.ReLU(),
         torch.nn.Dropout(0.3),
+        # Two class (cat and dog)
         torch.nn.Linear(512, 2),
         torch.nn.LogSoftmax(dim=1))
 
@@ -133,12 +129,11 @@ def model_training(
     optimizer):
     
     """
-    To train the CNN models.
-    It rerturning a trained model and loss values during training.
+    To train the CNN model.
+    It rerturning a trained model.
     """
 
     global device
-    Train_loss = []
 
     # Start the epoch iteration
     for epoch in range(num_epochs):
@@ -159,26 +154,21 @@ def model_training(
             train_loss += loss.item() * batch_size
 
         # Show the loss value per epoch
-        print("Epoch: {}, Loss: {:.4f}".
-              format(
-                  epoch + 1,
-                  train_loss / len(data_train.dataset)))
+        print("Epoch: {}, Loss: {:.4f}".format(
+            epoch + 1,
+            train_loss / len(data_train.dataset)))
 
-        # Add the loss value per epoch to main list
-        Train_loss.append(train_loss / len(data_train.dataset))
-
-    return model, Train_loss
+    return model
 
 
 def model_testing(data_test, model):
     """
     To test the performance of model.
-    It return confusion matrix, classification report
-    and area under curve score.
+    It return confusion matrix, classification report.
     """
 
     global device
-    actual, predict, predicton_label_loader = [], [], []
+    actual, predict = [], []
     model.eval()
 
     with torch.no_grad():
@@ -191,52 +181,11 @@ def model_testing(data_test, model):
             outputs = model(test)
             predicted = torch.max(outputs, 1)[1]
             predict.extend(predicted.data.tolist())
-            predicton_label_loader.append(predicted)
-
-    # Do one hot encoding to get AUC score
-    encoder = OneHotEncoder(sparse=False)
-    actual_encoded, predict_encoded = np.array(actual), np.array(predict)
-    actual_encoded, predict_encoded = actual_encoded.reshape(
-        len(actual_encoded), 1), predict_encoded.reshape(
-        len(predict_encoded), 1)
-    actual_encoded, predict_encoded = encoder.fit_transform(
-        actual_encoded), encoder.fit_transform(predict_encoded)
 
     return (
-        predicton_label_loader,
         confusion_matrix(actual, predict),
-        classification_report(actual, predict),
-        roc_auc_score(
-            actual_encoded,
-            predict_encoded,
-            multi_class='ovo',
-            average='macro'))
+        classification_report(actual, predict))
 
-
-def model_attacking(data_test, model):
-    """
-    This function is to attack the trained model
-    by testing it to peturbated test data.
-    """
-
-    # Iterate over adversarial attack methods
-    for method in FGSM, BIM, CW, RFGSM, PGDL2, TPGD, DeepFool:
-        correct, total = 0, 0
-        atk = method(model)
-
-        # Attack the model
-        for images, labels in data_test:
-            images = atk(images, labels).cuda()
-            outputs = model(images)
-
-            _, predicted = torch.max(outputs.data, 1)
-
-            total += labels.size(0)
-            correct += (predicted == labels.cuda()).sum()
-
-        # Show the accuracy of attacked model
-        print("Method used :", method,
-              '\nRobust accuracy :', (100 * float(correct) / total))
 
 def adversarial_training(
     batch_size: int,
@@ -248,12 +197,13 @@ def adversarial_training(
     adv_method):
     
     """
-    To train the CNN models.
-    It rerturning a trained model and loss values during training.
+    To train the CNN models adversarially.
+    It rerturning a robst trained model.
     """
 
     global device
-    Train_loss = []
+
+    # Initialization of adversarial method
     atk = adv_method(model)
 
     # Start the epoch iteration
@@ -263,9 +213,12 @@ def adversarial_training(
 
         # Traning model per batch image
         for images, labels in data_train:
+            # Add noisy to images
             images= atk(images, labels).cuda()
             labels = labels.to(device)
             train = images.view(-1, 3, 100, 100)
+            
+            # Attack the model
             outputs = model(train)
 
             optimizer.zero_grad()
@@ -276,12 +229,8 @@ def adversarial_training(
             train_loss += loss.item() * batch_size
 
         # Show the loss value per epoch
-        print("Epoch: {}, Loss: {:.4f}".
-              format(
-                  epoch + 1,
-                  train_loss / len(data_train.dataset)))
+        print("Epoch: {}, Loss: {:.4f}".format(
+            epoch + 1,
+            train_loss / len(data_train.dataset)))
 
-        # Add the loss value per epoch to main list
-        Train_loss.append(train_loss / len(data_train.dataset))
-
-    return model, Train_loss
+    return model
